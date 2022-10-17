@@ -22,6 +22,7 @@ import export_model
 import losses
 import frame_level_models
 import video_level_models
+import vlad_attention
 import readers
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
@@ -35,7 +36,7 @@ FLAGS = flags.FLAGS
 
 if __name__ == "__main__":
   # Dataset flags.
-  flags.DEFINE_string("train_dir", "/tmp/yt8m_model/",
+  flags.DEFINE_string("train_dir", "/home/jisha/yt8m_model/",
                       "The directory to save the model files in.")
   flags.DEFINE_string(
       "train_data_pattern", "",
@@ -612,7 +613,7 @@ def main(unused_argv):
   if not cluster or task.type == "master" or task.type == "worker":
     
     model = find_class_by_name(FLAGS.model, 
-        [frame_level_models, video_level_models])()
+        [frame_level_models, video_level_models,vlad_attention])()
     
     reader = get_reader()
     
@@ -635,4 +636,5 @@ def main(unused_argv):
                      (task_as_string(task), task.type))
 
 if __name__ == "__main__":
+  tf.compat.v1.disable_eager_execution()
   app.run()

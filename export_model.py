@@ -81,7 +81,7 @@ class ModelExporter(object):
               saved_model_utils.build_tensor_info(serialized_examples)}
 
     outputs = {
-        "video_id": saved_model_utils.build_tensor_info(video_id_output),
+        "id": saved_model_utils.build_tensor_info(video_id_output),
         "class_indexes": saved_model_utils.build_tensor_info(top_indices_output),
         "predictions": saved_model_utils.build_tensor_info(top_predictions_output)}
 

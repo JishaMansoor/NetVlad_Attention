@@ -23,7 +23,7 @@ import model_utils as utils
 
 import tensorflow.contrib.slim as slim
 from tensorflow import flags
-
+#import  tensorflow_addons as tfa
 import scipy.io as sio
 import numpy as np
 
@@ -186,7 +186,7 @@ class NetVLAD():
         self.max_frames = max_frames
         self.is_training = is_training
         self.add_batch_norm = add_batch_norm
-        self.cluster_size = cluster_size
+        self.cluster_size = int(cluster_size)
 
     def forward(self,reshaped_input):
 
@@ -629,6 +629,7 @@ class NetVLADModelLF(models.BaseModel):
     lightvlad = FLAGS.lightvlad
     vlagd = FLAGS.vlagd
 
+    print("frame cluster size" ,cluster_size)
     num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
     if random_frames:
       model_input = utils.SampleRandomFrames(model_input, num_frames,
@@ -667,6 +668,19 @@ class NetVLADModelLF(models.BaseModel):
     with tf.variable_scope("audio_VLAD"):
         vlad_audio = audio_NetVLAD.forward(reshaped_input[:,1024:])
 
+    if early_attention:
+         video_features = vlad_video #tf.reshape(vlad_video, [-1, max_frames, 1024])
+         print("jisha ",vlad_video.get_shape())
+         audio_features = vlad_audio #tf.reshape(vlad_audio, [-1, max_frames, 128])
+         video_attn_layer =  MultiHeadAttention(h=1, d_k=1024,d_v=1024, d_model=cluster_size)
+         audio_attn_layer =  MultiHeadAttention(h=1, d_k=cluster_size/2, d_v=cluster_size/2,d_model=cluster_size)
+         #video_attn_layer = tfa.layers.MultiHeadAttention(num_heads=1024, key_dim=2)
+         #audio_attn_layer = tfa.layers.MultiHeadAttention(num_heads=128, key_dim=2)
+         vlad_video_attn=video_attn_layer(video_features)
+         vlad_audio_attn=audio_attn_layer(audio_features)
+         vlad_video=vlad_video_attn
+         vlad_audio=vlad_audio_attn
+
     vlad = tf.concat([vlad_video, vlad_audio],1)
 
     vlad_dim = vlad.get_shape().as_list()[1] 
@@ -695,7 +709,7 @@ class NetVLADModelLF(models.BaseModel):
       activation = tf.nn.relu6(activation)
    
 
-    if gating:
+    if gating :
         gating_weights = tf.get_variable("gating_weights_2",
           [hidden1_size, hidden1_size],
           initializer = tf.random_normal_initializer(stddev=1 / math.sqrt(hidden1_size)))

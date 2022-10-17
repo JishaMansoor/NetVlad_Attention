@@ -31,7 +31,7 @@ FLAGS = flags.FLAGS
 
 if __name__ == "__main__":
   # Dataset flags.
-  flags.DEFINE_string("train_dir", "/tmp/yt8m_model/",
+  flags.DEFINE_string("train_dir", "/home/jisha/yt8m_model/",
                       "The directory to load the model files from. "
                       "The tensorboard metrics files are also saved to this "
                       "directory.")

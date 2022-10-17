@@ -33,7 +33,7 @@ import utils
 FLAGS = flags.FLAGS
 
 if __name__ == '__main__':
-  flags.DEFINE_string("train_dir", "/tmp/yt8m_model/",
+  flags.DEFINE_string("train_dir", "/home/jisha/yt8m_model/",
                       "The directory to load the model files from.")
   flags.DEFINE_string("output_file", "",
                       "The file to save the predictions to.")

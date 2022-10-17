@@ -48,7 +48,7 @@ def get_csv_header():
 
 def to_csv_row(json_data):
 
-  video_id = json_data["video_id"]
+  video_id = json_data["id"]
 
   class_indexes = json_data["class_indexes"]
   predictions = json_data["predictions"]
