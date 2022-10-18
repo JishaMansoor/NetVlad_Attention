@@ -164,7 +164,7 @@ class NetVLADAttnModel(models.BaseModel):
 
     with tf.variable_scope("audio_VLAD"):
         vlad_audio = audio_NetVLAD.forward(reshaped_input[:,1024:])
-    early_attention =  False
+    early_attention =  True
     if early_attention:
          video_features = vlad_video #tf.reshape(vlad_video, [-1, max_frames, 1024])
          video_features = tf.reshape(vlad_video,[-1 ,cluster_size ])#tf.reshape(vlad_video, [-1, max_frames, 1024])
