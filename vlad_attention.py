@@ -164,11 +164,13 @@ class NetVLADAttnModel(models.BaseModel):
 
     with tf.variable_scope("audio_VLAD"):
         vlad_audio = audio_NetVLAD.forward(reshaped_input[:,1024:])
-    early_attention =  True
+    early_attention =  False
     if early_attention:
          video_features = vlad_video #tf.reshape(vlad_video, [-1, max_frames, 1024])
+         video_features = tf.reshape(vlad_video,[-1 ,cluster_size ])#tf.reshape(vlad_video, [-1, max_frames, 1024])
          print("jisha ",vlad_video.get_shape())
          audio_features = vlad_audio #tf.reshape(vlad_audio, [-1, max_frames, 128])
+         audio_features = tf.reshape(vlad_audio,[-1,cluster_size//2]) #tf.reshape(vlad_audio, [-1, max_frames, 128])
          print( "video_feature " , video_features.get_shape()[1])
          h=1
          video_attn_layer =  MultiHeadAttention(h, d_k=video_features.get_shape()[1],d_v=video_features.get_shape()[1], d_model=video_features.get_shape()[1])
@@ -177,7 +179,9 @@ class NetVLADAttnModel(models.BaseModel):
          vlad_video_attn=video_attn_layer(video_features,video_features,video_features)
          vlad_audio_attn=audio_attn_layer(audio_features,audio_features,audio_features)
          vlad_video=vlad_video_attn
+         vlad_video=tf.reshape(vlad_video_attn,[-1,cluster_size*1024])
          vlad_audio=vlad_audio_attn
+         vlad_audio=tf.reshape(vlad_audio_attn,[-1,(cluster_size//2) * 128])
 
     print("vlad_video after attn", vlad_video)
     print("vlad_audio after attn", vlad_audio)
