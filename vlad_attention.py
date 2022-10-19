@@ -6,8 +6,7 @@ import models
 import model_utils as utils
 import tensorflow.contrib.slim as slim
 from tensorflow import  matmul, reshape, shape, transpose, cast, float32
-from tensorflow.keras.layers import Dense, Layer
-from tensorflow.keras.backend import softmax
+from tensorflow.layers import Dense, Layer
 import math
 FLAGS = flags.FLAGS
 
@@ -27,7 +26,7 @@ class DotProductAttention(Layer):
             scores += -1e9 * mask
  
         # Computing the weights by a softmax operation
-        weights = softmax(scores)
+        weights = tf.nn.softmax(scores)
  
         # Computing the attention by a weighted sum of the value vectors
         return matmul(weights, values)
@@ -41,10 +40,10 @@ class MultiHeadAttention(Layer):
         self.d_k = d_k  # Dimensionality of the linearly projected queries and keys
         self.d_v = d_v  # Dimensionality of the linearly projected values
         self.d_model = d_model  # Dimensionality of the model
-        self.W_q = Dense(d_k,activation = None)  # Learned projection matrix for the queries
-        self.W_k = Dense(d_k,activation = None)  # Learned projection matrix for the keys
-        self.W_v = Dense(d_v,activation = None)  # Learned projection matrix for the values
-        self.W_o = Dense(d_model,activation = None)  # Learned projection matrix for the multi-head output
+        self.W_q = Dense(d_k,use_bias=False,kernel_constraint=None,activation = None)  # Learned projection matrix for the queries
+        self.W_k = Dense(d_k,use_bias=False,kernel_constraint=None,activation = None)  # Learned projection matrix for the keys
+        self.W_v = Dense(d_v,use_bias=False,kernel_constraint=None,activation = None)  # Learned projection matrix for the values
+        self.W_o = Dense(d_model,use_bias=False,kernel_constraint=None,activation = None)  # Learned projection matrix for the multi-head output
         self.depth = self.d_model // self.heads
  
     def reshape_tensor(self, x, heads, flag):
@@ -131,8 +130,17 @@ class NetVLADAttnModel(models.BaseModel):
     remove_diag = FLAGS.gating_remove_diag
     lightvlad = FLAGS.lightvlad
     vlagd = FLAGS.vlagd
+    print("iterations", iterations)
     print("cluster size ", cluster_size)
-
+    print("add_batch_norm ", add_batch_norm)
+    print("random_frames ",random_frames)
+    print("hidden size",hidden1_size )
+    print("relu", relu)
+    print("dimred",dimred)
+    print("gating" ,gating)
+    print("remove_diag", remove_diag)
+    print("lightvlad",lightvlad)
+    print("vlagd",vlagd)
 
     num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
     if random_frames:
@@ -164,7 +172,7 @@ class NetVLADAttnModel(models.BaseModel):
 
     with tf.variable_scope("audio_VLAD"):
         vlad_audio = audio_NetVLAD.forward(reshaped_input[:,1024:])
-    early_attention =  True
+    early_attention =  False
     if early_attention:
          video_features = vlad_video #tf.reshape(vlad_video, [-1, max_frames, 1024])
          video_features = tf.reshape(vlad_video,[-1 ,cluster_size ])#tf.reshape(vlad_video, [-1, max_frames, 1024])
@@ -172,7 +180,7 @@ class NetVLADAttnModel(models.BaseModel):
          audio_features = vlad_audio #tf.reshape(vlad_audio, [-1, max_frames, 128])
          audio_features = tf.reshape(vlad_audio,[-1,cluster_size//2]) #tf.reshape(vlad_audio, [-1, max_frames, 128])
          print( "video_feature " , video_features.get_shape()[1])
-         h=1
+         h=8
          video_attn_layer =  MultiHeadAttention(h, d_k=video_features.get_shape()[1],d_v=video_features.get_shape()[1], d_model=video_features.get_shape()[1])
          audio_attn_layer =  MultiHeadAttention(h, d_k=audio_features.get_shape()[1], d_v=audio_features.get_shape()[1],d_model=audio_features.get_shape()[1])
 
