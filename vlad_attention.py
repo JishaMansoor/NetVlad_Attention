@@ -10,7 +10,24 @@ from tensorflow.layers import Dense, Layer
 import math
 FLAGS = flags.FLAGS
 
-
+flags.DEFINE_bool(
+    "add_batch_norm_attn", False,
+    "batch normalisation needed for attention")
+flags.DEFINE_bool(
+            "early_attention", False,
+            "Turning on early attention")
+flags.DEFINE_bool(
+            "shift_operation", False,
+            "turning on shift opertaion for attention ")
+flags.DEFINE_bool(
+            "late_attention", False,
+            "turning on late attention")
+flags.DEFINE_float(
+            "dropout_rate",0,
+            "drop out rate for attention")
+flags.DEFINE_integer(
+            "numofheads",1,
+            "number of heads for attention")
 # Implementing the Scaled-Dot Product Attention
 class DotProductAttention(Layer):
     def __init__(self, **kwargs):
@@ -33,7 +50,7 @@ class DotProductAttention(Layer):
  
 # Implementing the Multi-Head Attention
 class MultiHeadAttention(Layer):
-    def __init__(self, h, d_k, d_v, d_model, **kwargs):
+    def __init__(self, h, d_k, d_v, d_model,cluster_size ,is_training,**kwargs):
         super(MultiHeadAttention, self).__init__(**kwargs)
         self.attention = DotProductAttention()  # Scaled dot product attention
         self.heads = h  # Number of attention heads to use
@@ -45,21 +62,32 @@ class MultiHeadAttention(Layer):
         self.W_v = Dense(d_v,use_bias=False,kernel_constraint=None,activation = None)  # Learned projection matrix for the values
         self.W_o = Dense(d_model,use_bias=False,kernel_constraint=None,activation = None)  # Learned projection matrix for the multi-head output
         self.depth = self.d_model // self.heads
- 
+        self.cluster_size=cluster_size
+        self.early_attention=FLAGS.early_attention
+        self.shift_operation =FLAGS.shift_operation
+        self.add_batch_norm = FLAGS.add_batch_norm_attn
+        self.dropout_rate = FLAGS.dropout_rate
+        self.is_training = is_training
+        print("early_attention",self.early_attention)
+        print("shift_operation",self.shift_operation)
+        print("add_batch_norm_attn",self.add_batch_norm)
+        print("dropout_rate",self.dropout_rate)
+        print("is_training",self.is_training)
+
     def reshape_tensor(self, x, heads, flag):
         if flag:
             # Tensor shape after reshaping and transposing: (batch_size, heads, seq_length, -1)
-            print("flag " , shape(x)[0])
-            print("flag " , shape(x)[1])
             x = reshape(x, shape=(shape(x)[0], -1, heads, self.depth))
             #x = reshape(x, shape=(shape(x)[0], shape(x)[1], heads, -1))
             x = transpose(x, perm=(0, 2, 1, 3))
         else:
             # Reverting the reshaping and transposing operations: (batch_size, seq_length, d_k)
             x = transpose(x, perm=(0, 2, 1, 3))
-            print("not flag",x)
-            print("self.dk",self.d_k)
             x = reshape(x, shape=(shape(x)[0], -1,self.d_model))
+        if self.add_batch_norm:    
+            x = tf.layers.batch_normalization(x, training=self.is_training)
+        if self.is_training:
+            x = tf.nn.dropout(x, self.dropout_rate)
         return x
  
     def call(self, queries,keys,values, mask=None):
@@ -85,9 +113,22 @@ class MultiHeadAttention(Layer):
         print("self.head", self.heads)
         output = self.reshape_tensor(o_reshaped, self.heads, False)
         # Resulting tensor shape: (batch_size, input_seq_length, d_v)
- 
+        
+        if self.shift_operation:
+            normalized_output = tf.nn.l2_normalize(output, 1)
+            alpha = tf.get_variable("alpha",
+                                    [self.cluster_size],
+                                    initializer=tf.constant_initializer(1.0))
+            beta = tf.get_variable("beta",
+                                   [self.cluster_size],
+                                   initializer=tf.constant_initializer(0.0))
+            output = tf.multiply(normalized_output, alpha)
+            output = tf.add(output, beta)
+
+
         # Apply one final linear projection to the output to generate the multi-head attention
         # Resulting tensor shape: (batch_size, input_seq_length, d_model)
+
         normalized_output = tf.nn.l2_normalize(output, 1)
         normalized_output = tf.reshape(normalized_output, [-1, self.d_model])
         output = tf.nn.l2_normalize(normalized_output)
@@ -128,8 +169,6 @@ class NetVLADAttnModel(models.BaseModel):
     dimred = FLAGS.netvlad_dimred
     gating = FLAGS.gating
     remove_diag = FLAGS.gating_remove_diag
-    lightvlad = FLAGS.lightvlad
-    vlagd = FLAGS.vlagd
     print("iterations", iterations)
     print("cluster size ", cluster_size)
     print("add_batch_norm ", add_batch_norm)
@@ -139,8 +178,14 @@ class NetVLADAttnModel(models.BaseModel):
     print("dimred",dimred)
     print("gating" ,gating)
     print("remove_diag", remove_diag)
-    print("lightvlad",lightvlad)
-    print("vlagd",vlagd)
+    early_attention=FLAGS.early_attention
+    late_attention=FLAGS.late_attention
+    print("early_attention",early_attention)
+    print("late_attention",late_attention)
+    heads=FLAGS.numofheads
+    for k ,v in unused_params.items():
+        print("unused params")
+        print("param",k,v)
 
     num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
     if random_frames:
@@ -172,17 +217,14 @@ class NetVLADAttnModel(models.BaseModel):
 
     with tf.variable_scope("audio_VLAD"):
         vlad_audio = audio_NetVLAD.forward(reshaped_input[:,1024:])
-    early_attention =  False
     if early_attention:
-         video_features = vlad_video #tf.reshape(vlad_video, [-1, max_frames, 1024])
          video_features = tf.reshape(vlad_video,[-1 ,cluster_size ])#tf.reshape(vlad_video, [-1, max_frames, 1024])
          print("jisha ",vlad_video.get_shape())
-         audio_features = vlad_audio #tf.reshape(vlad_audio, [-1, max_frames, 128])
          audio_features = tf.reshape(vlad_audio,[-1,cluster_size//2]) #tf.reshape(vlad_audio, [-1, max_frames, 128])
          print( "video_feature " , video_features.get_shape()[1])
-         h=8
-         video_attn_layer =  MultiHeadAttention(h, d_k=video_features.get_shape()[1],d_v=video_features.get_shape()[1], d_model=video_features.get_shape()[1])
-         audio_attn_layer =  MultiHeadAttention(h, d_k=audio_features.get_shape()[1], d_v=audio_features.get_shape()[1],d_model=audio_features.get_shape()[1])
+         print("num of heads ",heads)
+         video_attn_layer =  MultiHeadAttention(heads, d_k=video_features.get_shape()[1],d_v=video_features.get_shape()[1], d_model=video_features.get_shape()[1],cluster_size=cluster_size,is_training=is_training)
+         audio_attn_layer =  MultiHeadAttention(heads, d_k=audio_features.get_shape()[1], d_v=audio_features.get_shape()[1],d_model=audio_features.get_shape()[1],cluster_size=cluster_size//2,is_training=is_training)
 
          vlad_video_attn=video_attn_layer(video_features,video_features,video_features)
          vlad_audio_attn=audio_attn_layer(audio_features,audio_features,audio_features)
@@ -221,9 +263,16 @@ class NetVLADAttnModel(models.BaseModel):
 
     if relu:
       activation = tf.nn.relu6(activation)
+    print("activation shape ", activation.get_shape())
+    
+    if(late_attention):
+         vlad_features = activation 
+         vlad_feature_attn_layer =  MultiHeadAttention(heads, d_k=vlad_features.get_shape()[1],d_v=vlad_features.get_shape()[1], d_model=vlad_features.get_shape()[1],cluster_size=cluster_size)
+         vlad_feature_attn=vlad_feature_attn_layer(vlad_features,vlad_features,vlad_features)
+         activation=tf.reshape(vlad_feature_attn,[-1,activation.get_shape()[1]])
+         print("activation shape after attention", activation.get_shape())
 
-
-    if (gating and not early_attention):
+    if (gating and not (early_attention or late_attention)):
         gating_weights = tf.get_variable("gating_weights_2",
           [hidden1_size, hidden1_size],
           initializer = tf.random_normal_initializer(stddev=1 / math.sqrt(hidden1_size)))
