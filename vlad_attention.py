@@ -89,7 +89,7 @@ class MultiHeadAttention(Layer):
         if self.add_batch_norm:    
             x = tf.layers.batch_normalization(x, training=self.is_training)
         if self.is_training:
-            x = tf.nn.dropout(x, self.dropout_rate)
+            x = tf.layers.dropout(x, self.dropout_rate)
         return x
  
     def call(self, queries,keys,values, mask=None):
