@@ -5,7 +5,7 @@ import video_level_models
 import models
 import model_utils as utils
 import tensorflow.contrib.slim as slim
-from tensorflow import  matmul, reshape, shape, transpose, cast, float32
+from tensorflow import  matmul, reshape, shape, transpose, cast, float32,logging
 from tensorflow.layers import Dense, Layer
 import math
 import numpy as np
@@ -36,23 +36,6 @@ flags.DEFINE_bool(
                     "Turning on very early attention")
 
 
-class PositionalEncoding(tf.keras.layers.Layer):
-    """Positional encoding."""
-    def __init__(self, num_hiddens, dropout, max_len=1000):
-        super().__init__()
-        self.dropout = tf.keras.layers.Dropout(dropout)
-        # Create a long enough P
-        self.P = np.zeros(( max_len, num_hiddens))
-        X = np.arange(max_len, dtype=np.float32).reshape(
-            -1,1)/np.power(10000, np.arange(
-            0, num_hiddens, 2, dtype=np.float32) / num_hiddens)
-        self.P[:, :, 0::2] = np.sin(X)
-        self.P[:, :, 1::2] = np.cos(X)
-
-    def call(self, X, **kwargs):
-        X = tf.add(X , self.P[:, :X.shape[1], :])
-        return (tf.cast(self.dropout(X, **kwargs),dtype=tf.float32))
-
 # Implementing the Scaled-Dot Product Attention
 class DotProductAttention(Layer):
     def __init__(self, **kwargs):
@@ -66,12 +49,6 @@ class DotProductAttention(Layer):
         # Apply mask to the attention scores
         if mask is not None:
             scores += -1e9 * mask
-
-        # NOT WORKING CODE
-        posi_encoding=False
-        if(posi_encoding):
-            pos_enc=PositionalEncoding(scores.get_shape()[1],0,max_len=scores.get_shape()[0] )
-            scores=pos_enc(scores)
 
         # Computing the weights by a softmax operation
         weights = tf.nn.softmax(scores)
@@ -96,10 +73,10 @@ class MultiHeadAttention(Layer):
         self.dropout_rate = FLAGS.dropout_rate
         self.is_training = is_training
 
-        self.W_q = Dense(d_k,use_bias=False,kernel_constraint=None,activation = None)  # Learned projection matrix for the queries
-        self.W_k = Dense(d_k,use_bias=False,kernel_constraint=None,activation = None)  # Learned projection matrix for the keys
-        self.W_v = Dense(d_v,use_bias=False,kernel_constraint=None,activation = None)  # Learned projection matrix for the values
-        self.W_o = Dense(d_model,use_bias=False,kernel_constraint=None,activation = None)  # Learned projection matrix for the multi-head output
+        self.W_q = Dense(d_k,kernel_constraint=None,activation = None)  # Learned projection matrix for the queries
+        self.W_k = Dense(d_k,kernel_constraint=None,activation = None)  # Learned projection matrix for the keys
+        self.W_v = Dense(d_v,kernel_constraint=None,activation = None)  # Learned projection matrix for the values
+        self.W_o = Dense(d_model,kernel_constraint=None,activation = None)  # Learned projection matrix for the multi-head output
 
 
     def reshape_tensor(self, x, heads, flag):
@@ -253,7 +230,7 @@ class NetVLADAttnModel(models.BaseModel):
          vlad_video_attn=video_attn_layer(video_features,video_features,video_features)
          vlad_video=tf.reshape(vlad_video_attn,[-1,cluster_size*1024])
 
-         audio_features = tf.reshape(vlad_audio,[-1,cluster_size//2]) 
+         audio_features = tf.reshape(vlad_audio,[-1,cluster_size//2])
          audio_attn_layer =  MultiHeadAttention(heads, d_k=audio_features.get_shape()[1], d_v=audio_features.get_shape()[1],d_model=audio_features.get_shape()[1],shift_size=cluster_size//2,is_training=is_training)
          vlad_audio_attn=audio_attn_layer(audio_features,audio_features,audio_features)
          vlad_audio=tf.reshape(vlad_audio_attn,[-1,(cluster_size//2) * 128])
