@@ -73,10 +73,10 @@ class MultiHeadAttention(Layer):
         self.dropout_rate = FLAGS.dropout_rate
         self.is_training = is_training
 
-        self.W_q = Dense(d_k,kernel_constraint=None,activation = None)  # Learned projection matrix for the queries
-        self.W_k = Dense(d_k,kernel_constraint=None,activation = None)  # Learned projection matrix for the keys
-        self.W_v = Dense(d_v,kernel_constraint=None,activation = None)  # Learned projection matrix for the values
-        self.W_o = Dense(d_model,kernel_constraint=None,activation = None)  # Learned projection matrix for the multi-head output
+        self.W_q = Dense(d_k,use_bias=False,kernel_constraint=None,activation = None)  # Learned projection matrix for the queries
+        self.W_k = Dense(d_k,use_bias=False,kernel_constraint=None,activation = None)  # Learned projection matrix for the keys
+        self.W_v = Dense(d_v,use_bias=False,kernel_constraint=None,activation = None)  # Learned projection matrix for the values
+        self.W_o = Dense(d_model,use_bias=False,kernel_constraint=None,activation = None)  # Learned projection matrix for the multi-head output
 
 
     def reshape_tensor(self, x, heads, flag):
@@ -268,7 +268,7 @@ class NetVLADAttnModel(models.BaseModel):
          vlad_feature_attn=vlad_feature_attn_layer(vlad_features,vlad_features,vlad_features)
          activation=tf.reshape(vlad_feature_attn,[-1,activation.get_shape()[1]])
 
-    if (gating and not (early_attention or late_attention)):
+    if (gating and not (early_attention or late_attention or very_early_attention)):
         gating_weights = tf.get_variable("gating_weights_2",
           [hidden1_size, hidden1_size],
           initializer = tf.random_normal_initializer(stddev=1 / math.sqrt(hidden1_size)))
