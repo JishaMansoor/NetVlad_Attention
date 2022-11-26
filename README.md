@@ -31,6 +31,8 @@ For training with full data set we used a google cloud platform Ubuntu 18.04 ins
 
 ![Screenshot](system_arch.PNG)
 
+Following is the command for downloading the full dataset
+
 Our Best model is is providing an evaluation result of 82.36% . 
 
 curl data.yt8m.org/download.py | partition=2/frame/train mirror=us python
@@ -38,8 +40,6 @@ curl data.yt8m.org/download.py | partition=2/frame/train mirror=us python
 curl data.yt8m.org/download.py | partition=2/frame/validate mirror=us python
 
 curl data.yt8m.org/download.py | partition=2/frame/test mirror=us python
-
-Following is the command for downloading the full dataset
 
 The Best training configuration model with full data is with following :
 
